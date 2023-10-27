@@ -34,23 +34,21 @@ struct user_host_memory {
 
     inline operator bool() const noexcept { return (bool)_mem; }
 
-    template<std::size_t Alignment = alignof(std::max_align_t)>
-    void* allocate(std::size_t s) {
-        if constexpr (Alignment <= alignof(std::max_align_t)) {
+    void* allocate(std::size_t s, std::size_t alignment = alignof(std::max_align_t)) {
+        if (alignment <= alignof(std::max_align_t)) {
             return (s > _size) ? nullptr : _mem;
         }
         else {
-            std::size_t space = s + Alignment + sizeof(void*) - 1;
+            std::size_t space = s + alignment + sizeof(void*) - 1;
             if (space > _size) return nullptr;
             std::size_t size = s + sizeof(void*);
             void* ptr = _mem;
-            void* aligned_ptr = std::align(Alignment, size, ptr, space);
+            void* aligned_ptr = std::align(alignment, size, ptr, space);
             return aligned_ptr;
         }
     }
 
-    template<std::size_t Alignment = alignof(std::max_align_t)>
-    void deallocate(void*, std::size_t) {
+    void deallocate(void*, std::size_t, std::size_t = alignof(std::max_align_t)) {
         // do nothing
     }
 

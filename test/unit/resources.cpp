@@ -13,6 +13,7 @@
 #include <hwmalloc2/resource/pinned.hpp>
 #include <hwmalloc2/resource/registered.hpp>
 #include <hwmalloc2/resource/arena.hpp>
+#include <hwmalloc2/any_resource.hpp>
 
 #include <vector>
 
@@ -67,6 +68,12 @@ TEST_CASE( "host memory2", "[concat]" ) {
         void* my_ptr = m3.allocate(128);
         auto k = m3.get_key(my_ptr, 128);
         m3.deallocate(my_ptr, 128);
+
+        any_resource m4{std::move(m3)};
+
+        void* my_ptr2 = m4.allocate(128);
+        auto k2 = m4.get_key(my_ptr2, 128);
+        m4.deallocate(my_ptr2, 128);
     }
 
     {
@@ -80,5 +87,11 @@ TEST_CASE( "host memory2", "[concat]" ) {
         void* my_ptr = m3.allocate(128);
         auto k = m3.get_key(my_ptr, 128);
         m3.deallocate(my_ptr, 128);
+
+        any_resource m4{std::move(m3)};
+
+        void* my_ptr2 = m4.allocate(128);
+        auto k2 = m4.get_key(my_ptr2, 128);
+        m4.deallocate(my_ptr2, 128);
     }
 }
