@@ -15,12 +15,13 @@
 namespace hwmalloc2 {
 namespace res {
 
-struct host_memory {
+template<typename Resource>
+struct host_memory : public Resource {
 
     std::unique_ptr<std::byte[]> _mem;
     std::size_t _size;
 
-    host_memory(std::size_t s) : _mem{ new std::byte[s] }, _size{s} {}
+    host_memory(Resource&& r, std::size_t s) : Resource{std::move(r)}, _mem{ new std::byte[s] }, _size{s} {}
 
     host_memory(host_memory&&) noexcept = default;
 
@@ -34,3 +35,4 @@ struct host_memory {
 
 } // namespace res
 } // namespace hwmalloc2
+

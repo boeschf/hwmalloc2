@@ -14,20 +14,11 @@ namespace hwmalloc2 {
 namespace res {
 
 template<typename Resource>
-struct pinned : public Resource {
+struct not_pinned : public Resource {
 
-    pinned(Resource&& r) : Resource{std::move(r)} {
-        // pin here
-    }
+    not_pinned(Resource&& r) : Resource{std::move(r)} {}
 
-    pinned(pinned&&) noexcept = default;
-
-    ~pinned() {
-        if (*this) {
-            // unpin here
-        }
-    }
-
+    not_pinned(not_pinned&&) noexcept = default;
 };
 
 } // namespace res

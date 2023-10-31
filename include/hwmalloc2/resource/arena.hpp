@@ -15,11 +15,11 @@
 namespace hwmalloc2 {
 namespace res {
 
-template<typename Memory>
-struct arena : public Memory {
+template<typename Resource>
+struct arena : public Resource {
 
-    arena(Memory&& mem)
-    : Memory{std::move(mem)}
+    arena(Resource&& r)
+    : Resource{std::move(r)}
     {
         // arena construction
     }

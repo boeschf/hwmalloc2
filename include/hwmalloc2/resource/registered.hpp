@@ -14,19 +14,18 @@
 namespace hwmalloc2 {
 namespace res {
 
-template<typename Memory, Registry R>
-struct registered : public Memory {
+template<typename Resource, Registry R>
+struct registered : public Resource {
 
     using region = std::decay_t<decltype(std::declval<R>().register_memory(nullptr, 0u))>;
     using key = std::decay_t<decltype(std::declval<region>().get_key(nullptr, 0u))>;
 
     region _region;
 
-    registered(Memory&& mem, R& r)
-    : Memory{std::move(mem)}
-    , _region{r.register_memory(this->data(), this->size())}
-    {
-    }
+    registered(Resource&& r, R& registry)
+    : Resource{std::move(r)}
+    , _region{registry.register_memory(this->data(), this->size())}
+    {}
 
     registered(registered&&) noexcept = default;
 

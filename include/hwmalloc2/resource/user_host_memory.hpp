@@ -16,15 +16,17 @@
 namespace hwmalloc2 {
 namespace res {
 
-struct user_host_memory {
+template<typename Resource>
+struct user_host_memory : public Resource {
 
     void* _mem;
     std::size_t _size;
 
-    user_host_memory(void* ptr, std::size_t s) : _mem{ptr}, _size{s} {}
+    user_host_memory(Resource&& r, void* ptr, std::size_t s) : Resource{std::move(r)}, _mem{ptr}, _size{s} {}
 
     user_host_memory(user_host_memory&& other) noexcept
-    : _mem{std::exchange(other._mem, nullptr)}
+    : Resource{std::move(other)}
+    , _mem{std::exchange(other._mem, nullptr)}
     , _size{std::exchange(other._size, 0u)}
     {}
 
@@ -33,25 +35,6 @@ struct user_host_memory {
     inline auto size() const noexcept { return _size; }
 
     inline operator bool() const noexcept { return (bool)_mem; }
-
-    void* allocate(std::size_t s, std::size_t alignment = alignof(std::max_align_t)) {
-        if (alignment <= alignof(std::max_align_t)) {
-            return (s > _size) ? nullptr : _mem;
-        }
-        else {
-            std::size_t space = s + alignment + sizeof(void*) - 1;
-            if (space > _size) return nullptr;
-            std::size_t size = s + sizeof(void*);
-            void* ptr = _mem;
-            void* aligned_ptr = std::align(alignment, size, ptr, space);
-            return aligned_ptr;
-        }
-    }
-
-    void deallocate(void*, std::size_t, std::size_t = alignof(std::max_align_t)) {
-        // do nothing
-    }
-
 };
 
 } // namespace res

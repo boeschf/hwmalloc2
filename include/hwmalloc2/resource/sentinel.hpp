@@ -9,26 +9,13 @@
  */
 #pragma once
 
+#include <cstddef>
+#include <memory>
 
 namespace hwmalloc2 {
 namespace res {
 
-template<typename Resource>
-struct pinned : public Resource {
-
-    pinned(Resource&& r) : Resource{std::move(r)} {
-        // pin here
-    }
-
-    pinned(pinned&&) noexcept = default;
-
-    ~pinned() {
-        if (*this) {
-            // unpin here
-        }
-    }
-
-};
+struct sentinel {};
 
 } // namespace res
 } // namespace hwmalloc2

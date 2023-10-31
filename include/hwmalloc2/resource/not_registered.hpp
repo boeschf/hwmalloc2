@@ -14,20 +14,18 @@ namespace hwmalloc2 {
 namespace res {
 
 template<typename Resource>
-struct pinned : public Resource {
+struct not_registered : public Resource {
 
-    pinned(Resource&& r) : Resource{std::move(r)} {
-        // pin here
-    }
+    struct key {
+        void* ptr;
+        std::size_t size;
+    };
 
-    pinned(pinned&&) noexcept = default;
+    not_registered(Resource&& r) : Resource{std::move(r)} {}
 
-    ~pinned() {
-        if (*this) {
-            // unpin here
-        }
-    }
+    not_registered(not_registered&&) noexcept = default;
 
+    key get_key(void* ptr, std::size_t s) const { return {ptr, s}; }
 };
 
 } // namespace res
