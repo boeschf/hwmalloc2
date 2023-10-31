@@ -24,7 +24,6 @@
 #include <hwmalloc2/any_resource.hpp>
 
 #include <tuple>
-#include <functional>
 
 namespace hwmalloc2 {
 
@@ -99,7 +98,7 @@ constexpr inline auto replace_arg(std::tuple<Ts...>&& args, std::tuple<Us...>&& 
 
 // replace element at position I of `args` with `arg`
 template<std::size_t I, typename... Ts, typename... Us>
-constexpr inline auto replace_arg(std::tuple<Ts...>&& args, std::tuple<Us...>&& arg) {
+constexpr inline auto replace_arg(std::tuple<Ts...> args, std::tuple<Us...> arg) {
     // dispatch to helper function by additionally passing indices
     return replace_arg<I>(std::move(args), std::move(arg), std::make_index_sequence<I>{}, std::make_index_sequence<sizeof...(Ts) - 1 - I>{});
 }
@@ -118,7 +117,6 @@ constexpr inline auto replace_arg(std::tuple<Ts...>&& args, std::tuple<Us...>&& 
 //                 a_20, a_21, ...},
 //             a_10, a_11, ...},
 //         a_00, a_01, ...};
-// where the constructor arguments a_* are moved from the tuple `args`
 
 // primary class template declaration with Index I defaulted to 0
 template <typename N, std::size_t I = 0>
@@ -130,19 +128,21 @@ struct nested_resource<N<Inner, More...>, I> {
 
     // instantiate N<Inner, More...> with the element at postion I of the tuple
     template<typename... Ts>
-    static auto instantiate(std::tuple<Ts...>&& args) {
+    static auto instantiate(const std::tuple<Ts...>& args) {
         // dispatch to helper function by additionally passing indices enumerating the arguments within the tuple at postion I in `args`
-        return instantiate(std::move(args), std::make_index_sequence<std::tuple_size_v<std::tuple_element_t<I, std::tuple<Ts...>>>>{});
+        return instantiate(args, std::make_index_sequence<std::tuple_size_v<std::tuple_element_t<I, std::tuple<Ts...>>>>{});
     }
 
     // helper function with indices to look up elements within tuple extracted with std::get<I>(args)
     template<typename... Ts, std::size_t... Is>
-    static auto instantiate(std::tuple<Ts...>&& args, std::index_sequence<Is...>) {
+    static auto instantiate(const std::tuple<Ts...>& args, std::index_sequence<Is...>) {
+        auto arg = std::get<I>(args);
         return N<Inner, More...>{
             // first constructor argument is the next nested resource (recurse)
             nested_resource<Inner, I+1>::instantiate(std::move(args)),
             // further constructor arguments are tagen from tuple of tuples
-            std::get<Is>(std::get<I>(std::move(args)))...
+            //std::get<Is>(std::get<I>(std::move(args)))...
+            std::get<Is>(std::move(arg))...
         };
     }
 };
@@ -153,7 +153,7 @@ struct nested_resource<::hwmalloc2::res::sentinel, I> {
 
     // return a default constructed sentinel
     template<typename... Ts>
-    static auto instantiate(std::tuple<Ts...>&& args) {
+    static auto instantiate(const std::tuple<Ts...>& args) {
         return ::hwmalloc2::res::sentinel{};
     }
 };
@@ -181,39 +181,41 @@ struct _resource_builder {
 
     _resource_builder() noexcept = default;
     _resource_builder(args_t&& a) : args{std::move(a)} {}
-    _resource_builder(const _resource_builder&) = delete;
-    _resource_builder(_resource_builder&&) = delete;
+    _resource_builder(const _resource_builder&) = default;
+    _resource_builder(_resource_builder&&) = default;
 
-    auto add_arena() {
+    auto add_arena() const {
         // arena resources are stored at position 0 in the resource nest
         return updated<0, res::arena>(std::tuple<>{});
     }
 
     template<Registry R>
-    auto register_memory(R& registry) {
+    auto register_memory(R& registry) const {
         // registered resources are stored at position 1 in the resource nest
         return updated<1, res::registered, R>(std::tuple<R&>{registry});
     }
 
-    auto pin() {
+    auto pin() const {
         // pinned resources are stored at position 2 in the resource nest
         return updated<2, res::pinned>(std::tuple<>{});
     }
 
-    auto alloc_on_host(std::size_t s) {
+    auto alloc_on_host(std::size_t s) const {
         // memory resources are stored at position 3 in the resource nest
         return updated<3, res::host_memory>(std::make_tuple(s));
     }
 
-    auto build() { return detail::nested_resource<resource_t>::instantiate(std::move(args)); }
+    auto build() const { return detail::nested_resource<resource_t>::instantiate(args); }
+
+    auto build_any() const { return any_resource{build()}; }
 
   private:
     template<std::size_t I, template<typename...> typename R, typename... M, typename Arg>
-    auto updated(Arg&& arg) {
+    auto updated(Arg arg) const {
         // create a new nested resource type by replacing the old resource class template
         using R_new = detail::replace_resource_t<I, resource_t, R, M...>;
         // create new arguments by replacing the old argument tuple
-        auto args_new = detail::replace_arg<I>(std::move(args), std::move(arg));
+        auto args_new = detail::replace_arg<I>(args, arg);
         // return new _resource_builder class template instantiation
         return _resource_builder<R_new, decltype(args_new)>{std::move(args_new)};
     }

@@ -29,7 +29,7 @@ class any_resource {
     struct pimpl : public iface {
         R _impl;
         pimpl(R r) noexcept : _impl{std::move(r)} {}
-        ~pimpl() = default;
+        ~pimpl() override final = default;
         void* allocate(std::size_t s, std::size_t a) override final { return _impl.allocate(s, a); }
         void deallocate(void* p, std::size_t s, std::size_t a) override final { _impl.deallocate(p, s, a); }
         std::any get_key(void* p, std::size_t s) override final { return _impl.get_key(p, s); }
