@@ -31,17 +31,6 @@ jobs:
 
     - uses: seanmiddleditch/gha-setup-ninja@v3
 
-    - name: "Linux: get build dependencies"
-      if: ${{ startsWith(matrix.os, 'ubuntu') }}
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y catch2
-
-    - name: "MacOS: get build dependencies"
-      if: ${{ startsWith(matrix.os, 'macos') }}
-      run: |
-        brew install catch2
-
     - name: Install LLVM and Clang
       if: ${{ matrix.c_compiler == 'clang' && matrix.os != 'macos-latest' }}
       uses: KyleMayes/install-llvm-action@v1
@@ -53,6 +42,21 @@ jobs:
       with:
         version: "15.0"
 
+    - name: Build Cache
+      uses: actions/cache@v3
+      with:
+        path: ~/.build-cache
+        key: build-cache-${{ matrix.os }}-${{ matrix.c_compiler }}-${{ github.run_id }}
+        restore-keys: build-cache-${{ matrix.os }}-${{ matrix.c_compiler }}-
+
+    - name: "Build dependencies"
+      run: |
+        git clone -c feature.manyFiles=true --depth 1 https://github.com/spack/spack.git
+        mkdir ~/.spack
+        source spack/share/spack/setup-env.sh
+        spack compiler find
+        spack install catch2
+
     - name: Set reusable strings
       id: strings
       shell: bash
@@ -60,13 +64,15 @@ jobs:
         echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
 
     - name: Configure CMake
-      run: >
-        cmake -B ${{ steps.strings.outputs.build-output-dir }}
-        -G Ninja
-        -DCMAKE_CXX_STANDARD=${{ matrix.cxx_standard }}
-        -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }}
-        -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
-        -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+      run: |
+        source spack/share/spack/setup-env.sh
+        spack load catch2
+        cmake -B ${{ steps.strings.outputs.build-output-dir }} \
+        -G Ninja \
+        -DCMAKE_CXX_STANDARD=${{ matrix.cxx_standard }} \
+        -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} \
+        -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} \
+        -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
         -S ${{ github.workspace }}
 
     - name: Build
