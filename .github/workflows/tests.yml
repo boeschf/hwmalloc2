@@ -32,12 +32,12 @@ jobs:
     - uses: seanmiddleditch/gha-setup-ninja@v3
 
     - name: Install LLVM and Clang
-      if: ${{ matrix.os != 'macos-latest' }}
+      if: ${{ matrix.c_compiler == 'clang' && matrix.os != 'macos-latest' }}
       uses: KyleMayes/install-llvm-action@v1
       with:
         version: "16.0"
     - name: Install LLVM and Clang
-      if: ${{ matrix.os == 'macos-latest' }}
+      if: ${{ matrix.c_compiler == 'clang' && matrix.os == 'macos-latest' }}
       uses: KyleMayes/install-llvm-action@v1
       with:
         version: "15.0"
@@ -53,7 +53,7 @@ jobs:
         cmake -B ${{ steps.strings.outputs.build-output-dir }}
         -G Ninja
         -DCMAKE_CXX_STANDARD=${{ matrix.cxx_standard }}
-        -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
+        -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }}
         -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
         -S ${{ github.workspace }}
