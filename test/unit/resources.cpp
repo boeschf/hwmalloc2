@@ -246,4 +246,14 @@ TEST_CASE( "host memory2", "[concat]" ) {
         auto k = m.get_key(my_ptr, 128);
         m.deallocate(my_ptr, 128);
     }
+
+    {
+        using namespace hwmalloc2;
+
+        auto m = host_resource(4096);
+
+        void* my_ptr = m.allocate(128);
+        auto k = m.get_key(my_ptr, 128);
+        m.deallocate(my_ptr, 128);
+    }
 }

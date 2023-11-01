@@ -128,14 +128,14 @@ struct nested_resource<N<Inner, More...>, I> {
 
     // instantiate N<Inner, More...> with the element at postion I of the tuple
     template<typename... Ts>
-    static auto instantiate(const std::tuple<Ts...>& args) {
+    static constexpr auto instantiate(const std::tuple<Ts...>& args) {
         // dispatch to helper function by additionally passing indices enumerating the arguments within the tuple at postion I in `args`
         return instantiate(args, std::make_index_sequence<std::tuple_size_v<std::tuple_element_t<I, std::tuple<Ts...>>>>{});
     }
 
     // helper function with indices to look up elements within tuple extracted with std::get<I>(args)
     template<typename... Ts, std::size_t... Is>
-    static auto instantiate(const std::tuple<Ts...>& args, std::index_sequence<Is...>) {
+    static constexpr auto instantiate(const std::tuple<Ts...>& args, std::index_sequence<Is...>) {
         auto arg = std::get<I>(args);
         return N<Inner, More...>{
             // first constructor argument is the next nested resource (recurse)
@@ -153,7 +153,7 @@ struct nested_resource<::hwmalloc2::res::sentinel, I> {
 
     // return a default constructed sentinel
     template<typename... Ts>
-    static auto instantiate(const std::tuple<Ts...>& args) {
+    static constexpr auto instantiate(const std::tuple<Ts...>& args) {
         return ::hwmalloc2::res::sentinel{};
     }
 };
@@ -177,41 +177,46 @@ struct _resource_builder {
     using resource_t = Resource;
     using args_t = Args;
 
-    args_t args;
+    const args_t args;
 
-    _resource_builder() noexcept = default;
-    _resource_builder(args_t&& a) : args{std::move(a)} {}
-    _resource_builder(const _resource_builder&) = default;
-    _resource_builder(_resource_builder&&) = default;
+    constexpr _resource_builder() noexcept = default;
+    constexpr _resource_builder(args_t&& a) : args{std::move(a)} {}
+    constexpr _resource_builder(const _resource_builder&) = default;
+    constexpr _resource_builder(_resource_builder&&) = default;
 
-    auto add_arena() const {
+    constexpr auto add_arena() const {
         // arena resources are stored at position 0 in the resource nest
         return updated<0, res::arena>(std::tuple<>{});
     }
 
     template<Registry R>
-    auto register_memory(R& registry) const {
+    constexpr auto register_memory(R& registry) const {
         // registered resources are stored at position 1 in the resource nest
         return updated<1, res::registered, R>(std::tuple<R&>{registry});
     }
 
-    auto pin() const {
+    constexpr auto pin() const {
         // pinned resources are stored at position 2 in the resource nest
         return updated<2, res::pinned>(std::tuple<>{});
     }
 
-    auto alloc_on_host(std::size_t s) const {
+    constexpr auto alloc_on_host(std::size_t s) const {
         // memory resources are stored at position 3 in the resource nest
         return updated<3, res::host_memory>(std::make_tuple(s));
     }
 
-    auto build() const { return detail::nested_resource<resource_t>::instantiate(args); }
+    constexpr auto use_host_memory(void* p, std::size_t s) const {
+        // memory resources are stored at position 3 in the resource nest
+        return updated<3, res::user_host_memory>(std::make_tuple(p, s));
+    }
 
-    auto build_any() const { return any_resource{build()}; }
+    constexpr auto build() const { return detail::nested_resource<resource_t>::instantiate(args); }
+
+    constexpr auto build_any() const { return any_resource{build()}; }
 
   private:
     template<std::size_t I, template<typename...> typename R, typename... M, typename Arg>
-    auto updated(Arg arg) const {
+    constexpr auto updated(Arg arg) const {
         // create a new nested resource type by replacing the old resource class template
         using R_new = detail::replace_resource_t<I, resource_t, R, M...>;
         // create new arguments by replacing the old argument tuple
@@ -221,8 +226,17 @@ struct _resource_builder {
     }
 };
 
+inline constexpr auto resource_builder() { return _resource_builder<>{}; }
 
-inline auto resource_builder() { return _resource_builder<>{}; }
+inline auto host_resource(std::size_t s) {
+    static constexpr auto b = resource_builder().pin().add_arena();
+    return b.alloc_on_host(4096).build();
+}
+
+inline auto host_resource(void* p, std::size_t s) {
+    static constexpr auto b = resource_builder().pin();
+    return b.use_host_memory(p, s).build();
+};
 
 } // namespace hwmalloc2
 
