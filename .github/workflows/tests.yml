@@ -29,7 +29,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - uses: seanmiddleditch/gha-setup-ninja@v3
+    - uses: seanmiddleditch/gha-setup-ninja@v4
 
     - name: Install LLVM and Clang
       if: ${{ matrix.c_compiler == 'clang' && matrix.os != 'macos-latest' }}
@@ -53,6 +53,7 @@ jobs:
       run: |
         git clone -c feature.manyFiles=true --depth 1 https://github.com/spack/spack.git
         mkdir ~/.spack
+        mkdir ~/.build-cache
         source spack/share/spack/setup-env.sh
         spack compiler find
         spack install catch2
