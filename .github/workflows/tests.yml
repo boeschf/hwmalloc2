@@ -53,7 +53,7 @@ jobs:
       run: |
         git clone -c feature.manyFiles=true --depth 1 https://github.com/spack/spack.git
         mkdir ~/.spack
-        mkdir ~/.build-cache
+        mkdir -p ~/.build-cache
         source spack/share/spack/setup-env.sh
         spack compiler find
         spack install catch2
