@@ -45,6 +45,114 @@ TEST_CASE( "Simple Concept Check2", "[concepts]" ) {
     static_assert(hwmalloc2::Registry<test_registry>);
 }
 
+template<
+    typename Res,
+    typename Arena,
+    typename Registered,
+    typename Pinned,
+    typename Memory>
+struct is_same_resource : public std::false_type {};
+
+template<template<typename...> typename R, typename... M>
+struct r_t {};
+
+template<
+    template<typename...> typename Arena,
+    template<typename...> typename Registered,
+    template<typename...> typename Pinned,
+    template<typename...> typename Memory,
+    typename... M0,
+    typename... M1,
+    typename... M2,
+    typename... M3>
+struct is_same_resource<
+    Arena<Registered<Pinned<Memory<hwmalloc2::res::sentinel,M3...>,M2...>,M1...>,M0...>,
+    r_t<Arena, M0...>,
+    r_t<Registered, M1...>,
+    r_t<Pinned, M2...>,
+    r_t<Memory, M3...>>
+: public std::true_type {};
+
+template<
+    typename Res,
+    typename Arena,
+    typename Registered,
+    typename Pinned,
+    typename Memory>
+inline constexpr bool is_same_resource_v = is_same_resource<Res, Arena, Registered, Pinned, Memory>::value;
+
+template<
+    typename Args,
+    typename A0,
+    typename A1,
+    typename A2,
+    typename A3>
+struct are_same_args : public std::false_type {};
+
+template<typename... A>
+struct a_t {};
+
+template<
+    typename... A0,
+    typename... A1,
+    typename... A2,
+    typename... A3>
+struct are_same_args<
+    std::tuple<std::tuple<A0...>, std::tuple<A1...>, std::tuple<A2...>, std::tuple<A3...>>,
+    a_t<A0...>,
+    a_t<A1...>,
+    a_t<A2...>,
+    a_t<A3...>>
+: public std::true_type {};
+
+template<
+    typename Args,
+    typename A0,
+    typename A1,
+    typename A2,
+    typename A3>
+inline constexpr bool are_same_args_v = are_same_args<Args, A0, A1, A2, A3>::value;
+
+template<
+    typename B,
+    typename Arena,
+    typename Registered,
+    typename Pinned,
+    typename Memory,
+    typename A0,
+    typename A1,
+    typename A2,
+    typename A3>
+inline constexpr bool check_builder_v = std::integral_constant<bool,
+    is_same_resource_v<typename B::resource_t, Arena, Registered, Pinned, Memory> &&
+    are_same_args_v<typename B::args_t, A0, A1, A2, A3>>::value;
+
+template<
+    typename Arena,
+    typename Registered,
+    typename Pinned,
+    typename Memory,
+    typename A0,
+    typename A1,
+    typename A2,
+    typename A3,
+    typename F>
+inline void check_builder(F f) {
+    auto b = f();
+    static_assert(check_builder_v<
+        decltype(b),
+        Arena,
+        Registered,
+        Pinned,
+        Memory,
+        A0,
+        A1,
+        A2,
+        A3
+    >);
+}
+
+
 TEST_CASE( "host memory2", "[concat]" ) {
 
     test_registry r;
@@ -57,21 +165,11 @@ TEST_CASE( "host memory2", "[concat]" ) {
         res::registered  m2{std::move(m1), r};
         res::arena       m3{std::move(m2)};
 
-        static_assert(
-            std::is_same_v<
-                decltype(m3),
-                res::arena<
-                    res::registered<
-                        res::pinned<
-                            res::host_memory<
-                                res::sentinel
-                            >
-                        >,
-                        test_registry
-                    >
-                >
-            >
-        );
+        static_assert(is_same_resource_v<decltype(m3),
+            r_t<res::arena>,
+            r_t<res::registered, test_registry>,
+            r_t<res::pinned>,
+            r_t<res::host_memory>>);
 
         void* my_ptr = m3.allocate(128);
         auto k = m3.get_key(my_ptr, 128);
@@ -93,6 +191,12 @@ TEST_CASE( "host memory2", "[concat]" ) {
         res::registered       m2{std::move(m1), r};
         res::not_arena        m3{std::move(m2)};
 
+        static_assert(is_same_resource_v<decltype(m3),
+            r_t<res::not_arena>,
+            r_t<res::registered, test_registry>,
+            r_t<res::pinned>,
+            r_t<res::user_host_memory>>);
+
         void* my_ptr = m3.allocate(128);
         auto k = m3.get_key(my_ptr, 128);
         m3.deallocate(my_ptr, 128);
@@ -107,116 +211,49 @@ TEST_CASE( "host memory2", "[concat]" ) {
     {
         using namespace hwmalloc2;
 
-        auto b = resource_builder();
+        check_builder<
+            r_t<res::not_arena>,
+            r_t<res::not_registered>,
+            r_t<res::not_pinned>,
+            r_t<res::host_memory>,
+            a_t<>,
+            a_t<>,
+            a_t<>,
+            a_t<std::size_t>
+        >([](){ return resource_builder().alloc_on_host(4096); });
 
-        auto b1 = b.alloc_on_host(4096);
-        static_assert(
-            std::is_same_v<
-                decltype(b1)::resource_t,
-                res::not_arena<
-                    res::not_registered<
-                        res::not_pinned<
-                            res::host_memory<
-                                res::sentinel
-                            >
-                        >
-                    >
-                >
-            >
-        );
-        static_assert(
-            std::is_same_v<
-                decltype(b1)::args_t,
-                std::tuple<
-                    std::tuple<>,
-                    std::tuple<>,
-                    std::tuple<>,
-                    std::tuple<std::size_t>
-                >
-            >
-        );
+        check_builder<
+            r_t<res::not_arena>,
+            r_t<res::not_registered>,
+            r_t<res::pinned>,
+            r_t<res::not_memory>,
+            a_t<>,
+            a_t<>,
+            a_t<>,
+            a_t<>
+        >([](){ return resource_builder().pin(); });
 
-        auto b2 = b.pin();
-        static_assert(
-            std::is_same_v<
-                decltype(b2)::resource_t,
-                res::not_arena<
-                    res::not_registered<
-                        res::pinned<
-                            res::not_memory<
-                                res::sentinel
-                            >
-                        >
-                    >
-                >
-            >
-        );
-        static_assert(
-            std::is_same_v<
-                decltype(b2)::args_t,
-                std::tuple<
-                    std::tuple<>,
-                    std::tuple<>,
-                    std::tuple<>,
-                    std::tuple<>
-                >
-            >
-        );
+        check_builder<
+            r_t<res::not_arena>,
+            r_t<res::registered, test_registry>,
+            r_t<res::not_pinned>,
+            r_t<res::not_memory>,
+            a_t<>,
+            a_t<test_registry&>,
+            a_t<>,
+            a_t<>
+        >([&r](){ return resource_builder().register_memory(r); });
 
-        auto b3 = b.register_memory(r);
-        static_assert(
-            std::is_same_v<
-                decltype(b3)::resource_t,
-                res::not_arena<
-                    res::registered<
-                        res::not_pinned<
-                            res::not_memory<
-                                res::sentinel
-                            >
-                        >,
-                        test_registry
-                    >
-                >
-            >
-        );
-        static_assert(
-            std::is_same_v<
-                decltype(b3)::args_t,
-                std::tuple<
-                    std::tuple<>,
-                    std::tuple<test_registry&>,
-                    std::tuple<>,
-                    std::tuple<>
-                >
-            >
-        );
-
-        auto b4 = b.add_arena();
-        static_assert(
-            std::is_same_v<
-                decltype(b4)::resource_t,
-                res::arena<
-                    res::not_registered<
-                        res::not_pinned<
-                            res::not_memory<
-                                res::sentinel
-                            >
-                        >
-                    >
-                >
-            >
-        );
-        static_assert(
-            std::is_same_v<
-                decltype(b4)::args_t,
-                std::tuple<
-                    std::tuple<>,
-                    std::tuple<>,
-                    std::tuple<>,
-                    std::tuple<>
-                >
-            >
-        );
+        check_builder<
+            r_t<res::arena>,
+            r_t<res::not_registered>,
+            r_t<res::not_pinned>,
+            r_t<res::not_memory>,
+            a_t<>,
+            a_t<>,
+            a_t<>,
+            a_t<>
+        >([](){ return resource_builder().add_arena(); });
     }
 
     {
@@ -226,21 +263,11 @@ TEST_CASE( "host memory2", "[concat]" ) {
             .register_memory(r)
             .build();
 
-        static_assert(
-            std::is_same_v<
-                decltype(m),
-                res::not_arena<
-                    res::registered<
-                        res::not_pinned<
-                            res::not_memory<
-                                res::sentinel
-                            >
-                        >,
-                        test_registry
-                    >
-                >
-            >
-        );
+        static_assert(is_same_resource_v<decltype(m),
+            r_t<res::not_arena>,
+            r_t<res::registered, test_registry>,
+            r_t<res::not_pinned>,
+            r_t<res::not_memory>>);
 
         void* my_ptr = m.allocate(128);
         auto k = m.get_key(my_ptr, 128);
@@ -251,6 +278,12 @@ TEST_CASE( "host memory2", "[concat]" ) {
         using namespace hwmalloc2;
 
         auto m = host_resource(4096);
+
+        static_assert(is_same_resource_v<decltype(m),
+            r_t<res::arena>,
+            r_t<res::not_registered>,
+            r_t<res::pinned>,
+            r_t<res::host_memory>>);
 
         void* my_ptr = m.allocate(128);
         auto k = m.get_key(my_ptr, 128);

@@ -177,8 +177,6 @@ struct _resource_builder {
     using resource_t = Resource;
     using args_t = Args;
 
-    const args_t args;
-
     constexpr _resource_builder() noexcept = default;
     constexpr _resource_builder(args_t&& a) : args{std::move(a)} {}
     constexpr _resource_builder(const _resource_builder&) = default;
@@ -215,6 +213,8 @@ struct _resource_builder {
     constexpr auto build_any() const { return any_resource{build()}; }
 
   private:
+    const args_t args;
+
     template<std::size_t I, template<typename...> typename R, typename... M, typename Arg>
     constexpr auto updated(Arg arg) const {
         // create a new nested resource type by replacing the old resource class template

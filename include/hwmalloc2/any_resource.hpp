@@ -15,6 +15,9 @@
 
 namespace hwmalloc2 {
 
+// type-erases resource and dispatches to allocation function through
+// virtual function calls
+// the keys are wrapped in a std::any object
 class any_resource {
 
   private:
